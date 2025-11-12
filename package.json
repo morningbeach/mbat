@@ -1,0 +1,22 @@
+{
+  "name": "mb-pack",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler pages dev . --local",
+    "build": "npx @cloudflare/next-on-pages@latest",
+    "migrate": "wrangler d1 migrations apply mb-pack-db",
+    "seed": "wrangler d1 execute mb-pack-db --file ./scripts/seed.sql",
+    "preview": "npx @cloudflare/next-on-pages@latest --output .vercel/output/static && wrangler pages dev . --local"
+  },
+  "dependencies": {
+    "hono": "^4.6.5",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@cloudflare/next-on-pages": "^1.13.7",
+    "@cloudflare/workers-types": "^4.20241112.0",
+    "wrangler": "^3.90.0"
+  }
+}

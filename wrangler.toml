@@ -1,0 +1,15 @@
+name = "mb-pack"
+compatibility_date = "2024-11-11"
+
+[vars]
+NODE_VERSION = "20"
+APP_ENV = "production"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mb-pack-db"
+# Fill this after `wrangler d1 create mb-pack-db`
+database_id = "REPLACE_WITH_YOUR_D1_ID"
+
+[site]
+bucket = ".vercel/output/static"
