@@ -1,71 +1,64 @@
 // functions/api/products.ts
-import { Hono } from 'hono';
+import { Hono } from 'hono'
+import { handle } from 'hono/cloudflare-pages'
 
 type Bindings = {
-  DB: D1Database;
-};
-
-type Product = {
-  id: string | number;
-  name: string;
-  price?: number | null;
-  image?: string | null;
-  description?: string | null;
-  created_at?: string | null;
-};
-
-// 讓 D1 的 .all() 統一回傳陣列
-async function d1All<T = unknown>(stmt: D1PreparedStatement): Promise<T[]> {
-  const res = await stmt.all<T>();
-  // 不同 Node 版本 / 打包可能有 res.results 或 res.rows
-  // @ts-expect-error 兼容不同型態
-  return (res?.results ?? res?.rows ?? []) as T[];
+  DB: D1Database
 }
 
-const app = new Hono<{ Bindings: Bindings }>();
+type Product = {
+  id: number
+  name: string
+  price?: number | null
+  image?: string | null
+  slug?: string | null
+}
 
-/**
- * GET /api/products
- * 取得所有產品（可依需要調整欄位）
- */
+type JsonOk<T> = { ok: true; data: T }
+type JsonErr = { ok: false; error: unknown }
+
+const app = new Hono<{ Bindings: Bindings }>()
+
+// 這支 function 被掛在 /api/products 路徑上
+// 因此這裡用 "/" 就能對應到 /api/products 本身
 app.get('/', async (c) => {
   try {
-    const rows = await d1All<Product>(
-      c.env.DB.prepare(
-        `SELECT id, name, price, image, description, created_at
-         FROM products
-         ORDER BY created_at DESC, id DESC`
-      )
-    );
-    return c.json({ ok: true, data: rows });
-  } catch (err) {
-    return c.json({ ok: false, error: String(err) }, 500);
-  }
-});
+    const { DB } = c.env
+    const { results } = await DB.prepare<Product>(
+      `SELECT id, name, price, image, slug
+       FROM products
+       ORDER BY id DESC
+       LIMIT 200`
+    ).all()
 
-/**
- * GET /api/products/:id
- * 取得單一產品
- */
+    return c.json<JsonOk<Product[]>>({ ok: true, data: results ?? [] })
+  } catch (e) {
+    return c.json<JsonErr>({ ok: false, error: String(e) }, 500)
+  }
+})
+
+// 例如 /api/products/123
 app.get('/:id', async (c) => {
   try {
-    const id = c.req.param('id');
-    const rows = await d1All<Product>(
-      c.env.DB.prepare(
-        `SELECT id, name, price, image, description, created_at
-         FROM products
-         WHERE id = ?1
-         LIMIT 1`
-      ).bind(id)
-    );
-    if (!rows.length) return c.json({ ok: false, error: 'NOT_FOUND' }, 404);
-    return c.json({ ok: true, data: rows[0] });
-  } catch (err) {
-    return c.json({ ok: false, error: String(err) }, 500);
-  }
-});
+    const id = Number(c.req.param('id'))
+    if (!Number.isFinite(id)) {
+      return c.json<JsonErr>({ ok: false, error: 'Invalid id' }, 400)
+    }
+    const { DB } = c.env
+    const row = await DB.prepare<Product>(
+      `SELECT id, name, price, image, slug
+       FROM products
+       WHERE id = ?`
+    ).bind(id).first()
 
-// ✅ Cloudflare Pages Functions 入口：把 ctx 直接當作 ExecutionContext 傳入
-export const onRequest: PagesFunction<Bindings> = async (ctx) => {
-  return app.fetch(ctx.request, ctx.env, ctx);
-};
+    if (!row) {
+      return c.json<JsonErr>({ ok: false, error: 'Not found' }, 404)
+    }
+    return c.json<JsonOk<Product>>({ ok: true, data: row })
+  } catch (e) {
+    return c.json<JsonErr>({ ok: false, error: String(e) }, 500)
+  }
+})
+
+// ✅ 核心：用 Hono 的 Cloudflare Pages adapter，自動處理 EventContext / ExecutionContext 差異
+export const onRequest: PagesFunction<Bindings> = handle(app)
