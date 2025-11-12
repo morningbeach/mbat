@@ -1,18 +1,56 @@
 {
   "compilerOptions": {
+    /* 目標平台與模組解析：Next 15 + App Router 推薦 */
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "verbatimModuleSyntax": true,
+
+    /* React/JSX 與型別嚴格度 */
     "jsx": "preserve",
     "strict": true,
+    "forceConsistentCasingInFileNames": true,
+
+    /* 常見相容性與效能選項（Next 官方要求/建議） */
+    "allowJs": true,
+    "noEmit": true,
+    "incremental": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
-    "types": ["@cloudflare/workers-types"]
+
+    /* 環境 lib：瀏覽器 + 迭代器 + 現代語法 */
+    "lib": ["dom", "dom.iterable", "esnext"],
+
+    /* 型別套件：
+       - workers-types 供 functions/* 使用（D1Database、PagesFunction 等）
+       - 若你遇到 Node/Workers 型別衝突，可把這裡改成空陣列，
+         然後在 functions/ 下建立單獨 tsconfig 或用三斜線引用。 */
+    "types": ["@cloudflare/workers-types"],
+
+    /* 路徑別名（可依你的專案習慣調整） */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"],
+      "@/app/*": ["app/*"],
+      "@/components/*": ["components/*"]
+    },
+
+    /* Next.js 專用 plugin：提供更好的型別體驗 */
+    "plugins": [{ "name": "next" }]
   },
+
+  /* 納入的檔案範圍 */
   "include": [
     "app/**/*",
     "components/**/*",
     "functions/**/*",
     "global.d.ts",
-    "next-env.d.ts"
-  ]
+    "next-env.d.ts",
+    ".next/types/**/*.ts"
+  ],
+
+  /* 排除 node_modules（避免型別掃描過慢或重複定義） */
+  "exclude": ["node_modules"]
 }
