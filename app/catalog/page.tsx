@@ -1,5 +1,7 @@
-// app/catalog/page.tsx
+// app/p/[slug]/page.tsx
 export const runtime = 'edge';
+
+import { notFound } from 'next/navigation';
 
 type Product = {
   id: number;
@@ -9,48 +11,47 @@ type Product = {
   slug: string;
 };
 
-type ApiResp<T> = {
-  ok?: boolean;
-  data?: T;
-  message?: string;
-};
+type ApiResp<T> = { ok?: boolean; data?: T; message?: string };
 
-// 用相對路徑最穩：同域 /api/products；若你真的需要外部 BASE_URL，再 fallback。
-async function getProducts(): Promise<Product[]> {
-  const url =
-    typeof process?.env?.NEXT_PUBLIC_BASE_URL === 'string' &&
-    process.env.NEXT_PUBLIC_BASE_URL.trim()
-      ? `${process.env.NEXT_PUBLIC_BASE_URL.replace(/\/$/, '')}/api/products`
-      : '/api/products';
-
-  const res = await fetch(url, { cache: 'no-store' });
-  if (!res.ok) return [];
-  const json = (await res.json()) as ApiResp<Product[]>;
-  return Array.isArray(json.data) ? json.data : [];
+async function getProduct(slug: string): Promise<Product | null> {
+  // 用相對路徑最穩（同域 Cloudflare Pages Functions）
+  const res = await fetch(`/api/products/${encodeURIComponent(slug)}`, {
+    cache: 'no-store',
+  });
+  if (!res.ok) return null;
+  const json = (await res.json()) as ApiResp<Product | null>;
+  return json.data ?? null;
 }
 
-// Server Component（預設）
-export default async function CatalogPage() {
-  const list = await getProducts();
+// Next.js 15：params 會是 Promise，要 await
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const product = await getProduct(slug);
+
+  if (!product) notFound();
 
   return (
-    <main className="container">
-      <h1 className="text-xl font-bold mb-4">Catalog</h1>
-      <ul className="space-y-2">
-        {list.map((p) => (
-          <li key={p.id} className="border p-3 rounded">
-            <a href={`/p/${p.slug}`} className="underline">
-              {p.name}
-            </a>
-            <div className="text-sm opacity-70">
-              {p.price != null ? `$${p.price}` : '—'}
-            </div>
-          </li>
-        ))}
-        {list.length === 0 && (
-          <li className="opacity-60">No products yet.</li>
-        )}
-      </ul>
+    <main className="container mx-auto p-6">
+      <h1 className="text-2xl font-semibold mb-2">{product.name}</h1>
+      {product.image ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={product.image}
+          alt={product.name}
+          className="w-64 h-64 object-cover rounded-lg"
+        />
+      ) : (
+        <div className="w-64 h-64 bg-gray-200 rounded-lg grid place-items-center">
+          No image
+        </div>
+      )}
+      <p className="mt-3 text-lg">
+        {product.price != null ? `$${product.price}` : '—'}
+      </p>
     </main>
   );
 }
