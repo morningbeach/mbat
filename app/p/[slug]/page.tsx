@@ -1,4 +1,6 @@
 // app/p/[slug]/page.tsx
+import { notFound } from 'next/navigation';
+
 export const dynamic = 'force-dynamic';
 export const runtime = 'edge';
 
@@ -10,49 +12,70 @@ type Product = {
   slug: string;
 };
 
-async function getProduct(slug: string): Promise<Product | null> {
-  const res = await fetch('/api/products', { cache: 'no-store' });
+async function fetchProducts(): Promise<Product[]> {
+  const res = await fetch('/api/products', {
+    cache: 'no-store',
+    // @ts-ignore
+    next: { revalidate: 0 },
+  }).catch(() => null);
+
+  if (!res || !res.ok) return [];
   let json: any = {};
-  try { json = await res.json(); } catch {}
-  const list: Product[] = Array.isArray(json?.data) ? json.data : [];
-  return list.find(p => p.slug === slug) ?? null;
+  try {
+    json = await res.json();
+  } catch {
+    return [];
+  }
+  const data = json?.data;
+  return Array.isArray(data) ? (data as Product[]) : [];
 }
 
-// 支援 Next 15：params 可能是 Promise
-type ParamsObj = { slug: string };
-type Props =
-  | { params: ParamsObj }
-  | { params: Promise<ParamsObj> };
+export default async function ProductPage({
+  // ✅ Next.js 15：params 是 Promise，需要 await
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
 
-export default async function ProductPage(props: Props) {
-  const params =
-    (props as any).params?.then
-      ? await (props as { params: Promise<ParamsObj> }).params
-      : (props as { params: ParamsObj }).params;
-
-  const product = await getProduct(params.slug);
+  const list = await fetchProducts();
+  const product = list.find((p) => p.slug === slug);
 
   if (!product) {
-    return (
-      <main className="container mx-auto p-6">
-        <h1 className="text-xl font-semibold">商品不存在</h1>
-        <p className="opacity-70 mt-2">
-          請回到 <a href="/catalog" className="underline">Catalog</a>
-        </p>
-      </main>
-    );
+    // 找不到就回 404
+    notFound();
   }
 
   return (
     <main className="container mx-auto p-6">
-      <h1 className="text-2xl font-semibold mb-2">{product.name}</h1>
+      <a href="/catalog" className="text-sm underline opacity-70">
+        ← Back to Catalog
+      </a>
+
+      <h1 className="text-2xl font-semibold mb-3">{product.name}</h1>
+
       {product.image ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={product.image} alt={product.name} className="w-64 h-64 object-cover rounded-lg" />
+        <img
+          src={product.image}
+          alt={product.name}
+          width={256}
+          height={256}
+          className="w-64 h-64 object-cover rounded-lg border mb-4"
+        />
       ) : (
-        <div className="w-64 h-64 grid place-items-center border rounded-lg">無圖</div>
+        <div className="w-64 h-64 grid place-items-center rounded-lg border mb-4 opacity-70">
+          無圖
+        </div>
       )}
-      <p className="mt-3">Price: {product.price ?? 'N/A'}</p>
+
+      <div className="space-y-1">
+        <div className="text-sm opacity-70">ID: {product.id}</div>
+        <div className="text-sm opacity-70">Slug: {product.slug}</div>
+        <div className="text-base">
+          {product.price == null ? 'Price: N/A' : `Price: ${product.price}`}
+        </div>
+      </div>
     </main>
   );
 }
