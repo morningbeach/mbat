@@ -1,42 +1,59 @@
 // app/p/[slug]/page.tsx
 export const runtime = 'edge';
-export const dynamic = 'force-dynamic';
 
-type PageProps = {
-  params: Promise<{ slug: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
+import { notFound } from 'next/navigation';
+
+type Product = {
+  id: number;
+  name: string;
+  price: number | null;
+  image: string | null;
+  slug: string;
 };
 
-export default async function ProductPage({ params }: PageProps) {
-  const { slug } = await params;
+type ApiResp<T> = { ok?: boolean; data?: T; message?: string };
 
-  // 伺服端 component 直接用相對路徑呼叫 API（由 Cloudflare Pages 轉發）
-  const res = await fetch(`/api/p/${slug}`, {
-    // 產品頁通常要即時：避免被預先快取
+async function getProduct(slug: string): Promise<Product | null> {
+  const res = await fetch(`/api/products/${encodeURIComponent(slug)}`, {
     cache: 'no-store',
   });
+  if (!res.ok) return null;
 
-  if (!res.ok) {
-    return (
-      <main className="container mx-auto p-6">
-        <h1 className="text-xl font-bold">Product not found</h1>
-      </main>
-    );
-  }
+  const json: ApiResp<Product | null> = await res.json(); // ← 明確註記型別，避免 unknown
+  return json.data ?? null;
+}
 
-  const product = await res.json();
+// Next 15：params 為 Promise，要 await
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+
+  const product = await getProduct(slug);
+  if (!product) notFound();
 
   return (
     <main className="container mx-auto p-6">
       <h1 className="text-2xl font-semibold mb-2">{product.name}</h1>
+
       {product.image ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={product.image} alt={product.name} className="w-64 h-64 object-cover rounded-lg" />
+        <img
+          src={product.image}
+          alt={product.name}
+          className="w-64 h-64 object-cover rounded-lg"
+        />
       ) : (
-        <div className="w-64 h-64 grid place-items-center rounded-lg border">No Image</div>
+        <div className="w-64 h-64 bg-gray-200 rounded-lg grid place-items-center">
+          No image
+        </div>
       )}
-      <p className="mt-4 text-lg">Price: {product.price ?? 'N/A'}</p>
-      <p className="text-gray-500 mt-1">slug: {slug}</p>
+
+      <p className="mt-3 text-lg">
+        {product.price != null ? `$${product.price}` : '—'}
+      </p>
     </main>
   );
 }
