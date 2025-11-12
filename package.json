@@ -3,25 +3,31 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "start": "next start",
+    "cf:build": "npx @cloudflare/next-on-pages@1.13.16",
+    "preview": "npx @cloudflare/next-on-pages@1.13.16 && wrangler pages dev . --local",
     "migrate": "wrangler d1 migrations apply mb-pack-db",
-    "seed": "wrangler d1 execute mb-pack-db --file ./scripts/seed.sql",
-    "preview": "npx @cloudflare/next-on-pages@1.13.16 && wrangler pages dev . --local"
+    "seed": "wrangler d1 execute mb-pack-db --file ./scripts/seed.sql"
   },
   "dependencies": {
     "next": "^15.5.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "hono": "^4.6.5",
     "zod": "^3.23.8"
   },
-  
   "devDependencies": {
-  "@types/react": "^18.3.11",
-  "@types/react-dom": "^18.3.1",
-  "@types/node": "^22.7.8"
-  },
-  
+    "@cloudflare/next-on-pages": "1.13.16",
+    "@cloudflare/workers-types": "^4.20241112.0",
+    "@types/node": "^22.7.8",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.1",
+    "typescript": "^5.6.3",
+    "wrangler": "^3.90.0"
+  }
 }
