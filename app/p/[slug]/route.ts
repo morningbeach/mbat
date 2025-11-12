@@ -1,55 +1,36 @@
-// app/api/p/[slug]/route.ts
+// app/p/[slug]/page.tsx
 export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
 
-import { getRequestContext } from '@cloudflare/next-on-pages';
-
-export async function GET(
-  _req: Request,
-  ctx: { params: { slug: string } }
-) {
-  const { env } = getRequestContext();
-  const DB = (env as any).DB as D1Database;
-
-  const slug = ctx.params.slug;
-
-  // 確保表存在
-  await DB.exec(`
-    CREATE TABLE IF NOT EXISTS products (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      price REAL,
-      image TEXT,
-      slug TEXT UNIQUE NOT NULL
-    );
-  `);
-
-  // 簡單種子
-  await DB.prepare(`
-    INSERT OR IGNORE INTO products (name, price, image, slug)
-    VALUES ('Tote Bag', 12.5, NULL, 'tote-bag'),
-           ('Gift Box', 25.0, NULL, 'gift-box')
-  `).run();
-
-  const row = await DB.prepare(
-    `SELECT id, name, price, image, slug FROM products WHERE slug = ? LIMIT 1`
-  ).bind(slug).first<Product>();
-
-  if (!row) {
-    return new Response(JSON.stringify({ ok: false, error: 'Not found' }), {
-      status: 404,
-      headers: { 'content-type': 'application/json; charset=utf-8' },
-    });
-  }
-
-  return new Response(JSON.stringify(row), {
-    headers: { 'content-type': 'application/json; charset=utf-8' },
-  });
-}
-
-type Product = {
-  id: number;
-  name: string;
-  price: number | null;
-  image: string | null;
-  slug: string;
+type PageProps = {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
+
+export default async function ProductPage({ params }: PageProps) {
+  const { slug } = await params;
+
+  const res = await fetch(`/api/p/${slug}`, { cache: 'no-store' });
+  if (!res.ok) {
+    return (
+      <main className="container mx-auto p-6">
+        <h1 className="text-xl font-bold">Product not found</h1>
+      </main>
+    );
+  }
+  const product = await res.json();
+
+  return (
+    <main className="container mx-auto p-6">
+      <h1 className="text-2xl font-semibold mb-2">{product.name}</h1>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      {product.image ? (
+        <img src={product.image} alt={product.name} className="w-64 h-64 object-cover rounded-lg" />
+      ) : (
+        <div className="w-64 h-64 grid place-items-center rounded-lg border">No Image</div>
+      )}
+      <p className="mt-4 text-lg">Price: {product.price ?? 'N/A'}</p>
+      <p className="text-gray-500 mt-1">slug: {slug}</p>
+    </main>
+  );
+}
