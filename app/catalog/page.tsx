@@ -1,65 +1,16 @@
-'use client';
+export const runtime = 'edge';
 
-import { useEffect, useState } from 'react';
-import { z } from 'zod';
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-const ProductSchema = z.object({
-  id: z.union([z.number(), z.string()]),
-  name: z.string(),
-  price: z.number().optional(),
-  image: z.string().optional(),
-});
-const ApiRespSchema = z.object({
-  data: z.array(ProductSchema).default([]),
-});
-type Product = z.infer<typeof ProductSchema>;
-
-export default function CatalogPage() {
-  const [data, setData] = useState<Product[]>([]);
-  const [err, setErr] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const r = await fetch('/api/products', { cache: 'no-store' });
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const json = await r.json();
-        const parsed = ApiRespSchema.parse(json);
-        setData(parsed.data);
-      } catch (e) {
-        setErr(String(e));
-        setData([]);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
-  if (loading) return <div className="p-6">Loading…</div>;
-  if (err) return <div className="p-6 text-red-600">Error: {err}</div>;
-  if (!data.length) return <div className="p-6 text-gray-500">目前沒有商品。</div>;
+export default async function CatalogPage({ searchParams }: { searchParams: SearchParams }) {
+  const sp = await searchParams;
+  const q = (sp.q as string | undefined) ?? '';
 
   return (
-    <main className="p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-      {data.map((p) => (
-        <article key={String(p.id)} className="rounded-2xl border p-4 shadow-sm">
-          {p.image ? (
-            <img
-              src={p.image}
-              alt={p.name}
-              className="w-full h-48 object-cover rounded-xl mb-3"
-            />
-          ) : null}
-
-          <h2 className="font-semibold text-lg">{p.name}</h2>
-          {'price' in p && typeof p.price === 'number' ? (
-            <p className="text-sm text-gray-600 mt-1">${p.price.toFixed(2)}</p>
-          ) : (
-            <p className="text-sm text-gray-400 mt-1">Price on request</p>
-          )}
-        </article>
-      ))}
+    <main className="container mx-auto p-6">
+      <h1 className="text-xl font-bold">Catalog</h1>
+      <p className="mt-2 text-sm text-gray-600">query: <b>{q || '（空）'}</b></p>
+      <p className="mt-4">資料請打 <code>/api/catalog</code> 驗證 D1 連線。</p>
     </main>
   );
 }
