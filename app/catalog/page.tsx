@@ -1,47 +1,57 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
+import { z } from 'zod';
 
-type Product = {
-  id: string
-  name: string
-  slug: string
-  short_desc?: string
-  hero_image?: string
-  category?: string
-}
+// ---- 型別定義（用 Zod 解析 API 回傳）----
+const ProductSchema = z.object({
+  id: z.union([z.number(), z.string()]),
+  name: z.string(),
+  price: z.number().optional(),
+  image: z.string().optional(),
+  // 你還有其他欄位可以自行加：description、sku、category...
+});
+const ApiRespSchema = z.object({
+  data: z.array(ProductSchema).default([]),
+});
 
-export default function Catalog() {
-  const [data, setData] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
-  const [err, setErr] = useState<string | null>(null)
+type Product = z.infer<typeof ProductSchema>;
+
+// ---- 元件 ----
+export default function CatalogPage() {
+  const [data, setData] = useState<Product[]>([]);
+  const [err, setErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/products')
-      .then(r => r.json())
-      .then(j => setData(j.data || []))
-      .catch(e => setErr(String(e)))
-      .finally(() => setLoading(false))
-  }, [])
+    (async () => {
+      try {
+        const r = await fetch('/api/products', { cache: 'no-store' });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        // 這裡把 unknown 轉成有型別的物件
+        const json = await r.json();
+        const parsed = ApiRespSchema.parse(json);
+        setData(parsed.data);
+      } catch (e) {
+        setErr(String(e));
+        setData([]); // 保底
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
-  if (loading) return <p>載入中…</p>
-  if (err) return <p>錯誤：{err}</p>
+  if (loading) return <div className="p-6">Loading…</div>;
+  if (err) return <div className="p-6 text-red-600">Error: {err}</div>;
+
+  if (!data.length) {
+    return <div className="p-6 text-gray-500">目前沒有商品。</div>;
+  }
 
   return (
-    <section>
-      <h1>產品目錄</h1>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
-        {data.map(p => (
-          <a key={p.id} href={`/p/${p.slug}`} style={{ border: '1px solid #eee', padding: 12, borderRadius: 8, textDecoration: 'none' }}>
-            <div style={{ aspectRatio: '4/3', background: '#f8f8f8', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span>{p.hero_image ? '圖' : 'No Image'}</span>
-            </div>
-            <strong>{p.name}</strong>
-            <div style={{ color: '#777' }}>{p.short_desc || ''}</div>
-            <div style={{ fontSize: 12, color: '#999', marginTop: 6 }}>{p.category || ''}</div>
-          </a>
-        ))}
-      </div>
-    </section>
-  )
-}
+    <main className="p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+      {data.map((p) => (
+        <article key={String(p.id)} className="rounded-2xl border p-4 shadow-sm">
+          {p.image ? (
+            // 你已把 images.unoptimized 設 true，可用 <img>
+            <
