@@ -1,65 +1,104 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
+import { useState } from 'react';
 
-export default function RFQPage() {
-  const [submitting, setSubmitting] = useState(false)
-  const [ok, setOk] = useState<string | null>(null)
-  const [err, setErr] = useState<string | null>(null)
+// 你後端 /api/rfq 應回這種型別
+type RfqResponse =
+  | { ok: true; rfq_id: string }
+  | { ok: false; error?: unknown };
+
+export default function RfqPage() {
+  const [okMsg, setOk] = useState<string | null>(null);
+  const [errMsg, setErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setSubmitting(true); setOk(null); setErr(null)
-
-    const form = new FormData(e.currentTarget)
-    const payload = {
-      company: {
-        name: form.get('company') as string,
-        contact_name: form.get('name') as string,
-        contact_email: form.get('email') as string,
-        contact_phone: form.get('phone') as string || undefined,
-      },
-      items: [{
-        product_id: form.get('product_id') as string,
-        variant_id: (form.get('variant_id') as string) || undefined,
-        quantity: Number(form.get('quantity') || 0),
-        expected_ship_date: (form.get('ship') as string) || undefined,
-        notes: (form.get('notes') as string) || undefined
-      }],
-      note: (form.get('note') as string) || undefined
-    }
+    e.preventDefault();
+    setOk(null);
+    setErr(null);
+    setLoading(true);
 
     try {
-      const res = await fetch('/api/rfq', { method: 'POST', body: JSON.stringify(payload) })
-      const j = await res.json()
-      if (!res.ok || !j.ok) throw new Error(j.error ? JSON.stringify(j.error) : '提交失敗')
-      setOk(`已送出！RFQ ID: ${j.rfq_id}`)
-      e.currentTarget.reset()
-    } catch (e: any) {
-      setErr(String(e.message || e))
+      const form = new FormData(e.currentTarget);
+      const payload = {
+        name: String(form.get('name') ?? ''),
+        email: String(form.get('email') ?? ''),
+        message: String(form.get('message') ?? ''),
+      };
+
+      const res = await fetch('/api/rfq', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      // 明確告訴 TS 我們期望的 JSON 型別
+      const j: RfqResponse = await res.json();
+
+      if (!res.ok || !j || j.ok !== true) {
+        const msg =
+          j && 'error' in j && j.error
+            ? JSON.stringify(j.error)
+            : `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+
+      setOk(`已送出！RFQ ID: ${j.rfq_id}`);
+      e.currentTarget.reset();
+    } catch (err) {
+      setErr(String(err));
     } finally {
-      setSubmitting(false)
+      setLoading(false);
     }
   }
 
   return (
-    <section>
-      <h1>詢價</h1>
-      <form onSubmit={onSubmit} style={{ maxWidth: 520, display: 'grid', gap: 10 }}>
-        <label>公司 / 品牌<input required name="company" /></label>
-        <label>聯絡人<input required name="name" /></label>
-        <label>Email<input required type="email" name="email" /></label>
-        <label>電話<input name="phone" /></label>
-        <hr />
-        <label>產品ID<input required name="product_id" placeholder="seed 裡預設會有一個產品" /></label>
-        <label>變體ID（選填）<input name="variant_id" /></label>
-        <label>數量<input required name="quantity" type="number" min="1" /></label>
-        <label>期望出貨日<input name="ship" type="date" /></label>
-        <label>備註<textarea name="notes" /></label>
-        <button disabled={submitting} type="submit">{submitting ? '送出中…' : '送出詢價'}</button>
-        {ok && <p style={{ color: 'green' }}>{ok}</p>}
-        {err && <p style={{ color: 'red' }}>{err}</p>}
+    <main className="max-w-xl mx-auto p-6 space-y-4">
+      <h1 className="text-2xl font-semibold">索取報價（RFQ）</h1>
+
+      {okMsg && <div className="rounded-lg bg-green-50 text-green-700 p-3">{okMsg}</div>}
+      {errMsg && <div className="rounded-lg bg-red-50 text-red-700 p-3">錯誤：{errMsg}</div>}
+
+      <form onSubmit={onSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm mb-1">名字</label>
+          <input
+            name="name"
+            required
+            className="w-full rounded-lg border px-3 py-2"
+            placeholder="Your name"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm mb-1">Email</label>
+          <input
+            type="email"
+            name="email"
+            required
+            className="w-full rounded-lg border px-3 py-2"
+            placeholder="you@example.com"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm mb-1">需求內容</label>
+          <textarea
+            name="message"
+            rows={5}
+            className="w-full rounded-lg border px-3 py-2"
+            placeholder="請描述您要的尺寸、材質、數量、交期…"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="rounded-xl px-4 py-2 border shadow-sm disabled:opacity-60"
+        >
+          {loading ? '送出中…' : '送出'}
+        </button>
       </form>
-    </section>
-  )
+    </main>
+  );
 }
