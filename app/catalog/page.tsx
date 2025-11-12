@@ -1,57 +1,24 @@
-// app/p/[slug]/page.tsx
-export const runtime = 'edge';
-
-import { notFound } from 'next/navigation';
-
-type Product = {
-  id: number;
-  name: string;
-  price: number | null;
-  image: string | null;
-  slug: string;
-};
-
-type ApiResp<T> = { ok?: boolean; data?: T; message?: string };
-
-async function getProduct(slug: string): Promise<Product | null> {
-  // 用相對路徑最穩（同域 Cloudflare Pages Functions）
-  const res = await fetch(`/api/products/${encodeURIComponent(slug)}`, {
-    cache: 'no-store',
-  });
-  if (!res.ok) return null;
-  const json = (await res.json()) as ApiResp<Product | null>;
-  return json.data ?? null;
-}
-
-// Next.js 15：params 會是 Promise，要 await
-export default async function ProductPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
-  const { slug } = await params;
-  const product = await getProduct(slug);
-
-  if (!product) notFound();
+export default async function CatalogPage() {
+  const res = await fetch('/api/products', { cache: 'no-store' });
+  let json: any = {};
+  try { json = await res.json(); } catch {}
+  const list = Array.isArray(json?.data) ? json.data : [];
 
   return (
-    <main className="container mx-auto p-6">
-      <h1 className="text-2xl font-semibold mb-2">{product.name}</h1>
-      {product.image ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={product.image}
-          alt={product.name}
-          className="w-64 h-64 object-cover rounded-lg"
-        />
-      ) : (
-        <div className="w-64 h-64 bg-gray-200 rounded-lg grid place-items-center">
-          No image
-        </div>
+    <main className="container">
+      <h1 className="text-xl font-bold mb-4">Catalog</h1>
+      <ul className="space-y-2">
+        {list.map((p: any) => (
+          <li key={p.id}>
+            <a href={`/p/${p.slug}`} className="underline">{p.name}</a>
+          </li>
+        ))}
+      </ul>
+      {!list.length && (
+        <p className="text-sm opacity-70 mt-3">
+          沒拿到資料（可能 D1 尚未綁定），目前已啟用 fallback，請先檢查 Settings。
+        </p>
       )}
-      <p className="mt-3 text-lg">
-        {product.price != null ? `$${product.price}` : '—'}
-      </p>
     </main>
   );
 }
