@@ -7,11 +7,22 @@ export interface Product {
   slug: string;
 }
 
-export const onRequestGet: PagesFunction = async ({ env }) => {
-  try {
-    const DB = (env as any).DB as D1Database;
+type Bindings = { DB?: D1Database };
 
-    // 建表
+export const onRequestGet: PagesFunction<Bindings> = async ({ env }) => {
+  try {
+    const DB = (env as Bindings).DB;
+
+    // 沒綁 D1：直接回內建資料，避免 500
+    if (!DB) {
+      const fallback: Product[] = [
+        { id: 1, name: 'Tote Bag', price: 12.5, image: null, slug: 'tote-bag' },
+        { id: 2, name: 'Gift Box', price: 25.0, image: null, slug: 'gift-box' },
+      ];
+      return Response.json({ ok: true, source: 'fallback', data: fallback });
+    }
+
+    // 有 D1：正常讀 DB（含建表與種子）
     await DB.exec(`
       CREATE TABLE IF NOT EXISTS products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -22,28 +33,24 @@ export const onRequestGet: PagesFunction = async ({ env }) => {
       );
     `);
 
-    // 種子資料（避免重覆）
     await DB.prepare(`
       INSERT OR IGNORE INTO products (name, price, image, slug)
       VALUES ('Tote Bag', 12.5, NULL, 'tote-bag'),
              ('Gift Box', 25.0, NULL, 'gift-box')
     `).run();
 
-    // 這裡重點：泛型放在 .all<Product>()
     const { results } = await DB.prepare(`
       SELECT id, name, price, image, slug
       FROM products
       ORDER BY id DESC
     `).all<Product>();
 
-    return new Response(JSON.stringify({ ok: true, data: results }), {
-      headers: { 'content-type': 'application/json; charset=utf-8' },
-      status: 200,
-    });
+    return Response.json({ ok: true, source: 'd1', data: results ?? [] });
   } catch (err: any) {
-    return new Response(JSON.stringify({ ok: false, error: String(err?.message ?? err) }), {
-      headers: { 'content-type': 'application/json; charset=utf-8' },
-      status: 500,
-    });
+    // 避免未處理例外導致 500
+    return new Response(
+      JSON.stringify({ ok: false, error: String(err?.message ?? err) }),
+      { status: 200, headers: { 'content-type': 'application/json' } }
+    );
   }
 };
