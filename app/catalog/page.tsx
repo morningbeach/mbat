@@ -1,6 +1,6 @@
 // app/catalog/page.tsx
 export const dynamic = 'force-dynamic';
-export const runtime = 'edge'; // Cloudflare Pages 友善
+export const runtime = 'edge';
 
 type Product = {
   id: number;
@@ -11,15 +11,13 @@ type Product = {
 };
 
 async function fetchProducts(): Promise<Product[]> {
-  // 用相對路徑，避免不同環境 BASE_URL 造成的 CORS / URL 問題
   const res = await fetch('/api/products', {
     cache: 'no-store',
-    // @ts-ignore: Next 15 仍接受 next.revalidate=0
+    // @ts-ignore
     next: { revalidate: 0 },
-  });
+  }).catch(() => null);
 
-  // API 失敗時回空陣列，避免頁面 500
-  if (!res.ok) return [];
+  if (!res || !res.ok) return [];
 
   let json: any = {};
   try {
@@ -32,7 +30,6 @@ async function fetchProducts(): Promise<Product[]> {
   return Array.isArray(data) ? (data as Product[]) : [];
 }
 
-// 預設即為 Server Component
 export default async function CatalogPage() {
   const list = await fetchProducts();
 
@@ -42,9 +39,9 @@ export default async function CatalogPage() {
 
       {list.length === 0 ? (
         <div className="rounded-lg border p-6">
-          <p className="opacity-70">目前尚無商品或 API 暫時沒有回資料。</p>
+          <p className="opacity-70">目前沒有商品或 API 尚未回傳資料。</p>
           <p className="opacity-70">
-            請稍後重試，或前往 <a href="/admin" className="underline">Admin</a> 新增商品。
+            可稍後重試，或前往 <a href="/admin" className="underline">Admin</a> 新增。
           </p>
         </div>
       ) : (
@@ -53,4 +50,33 @@ export default async function CatalogPage() {
             <li key={p.id} className="flex items-center gap-3">
               {/* 圖片（若無圖則顯示占位） */}
               {p.image ? (
-                // eslint-disable-next-lin
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={p.image}
+                  alt={p.name}
+                  width={64}
+                  height={64}
+                  className="w-16 h-16 object-cover rounded-lg border"
+                />
+              ) : (
+                <div className="w-16 h-16 grid place-items-center rounded-lg border text-xs opacity-70">
+                  無圖
+                </div>
+              )}
+
+              <div className="flex-1">
+                <a href={`/p/${p.slug}`} className="font-medium underline">
+                  {p.name}
+                </a>
+                <div className="text-sm opacity-70">
+                  {p.price == null ? 'Price: N/A' : `Price: ${p.price}`}
+                </div>
+                <div className="text-xs opacity-60">slug: {p.slug}</div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </main>
+  );
+}
