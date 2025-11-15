@@ -1,37 +1,38 @@
 // app/catalog/page.tsx
-export const dynamic = 'force-dynamic';
-export const runtime = 'edge';
+export const dynamic = 'force-dynamic'
+export const runtime = 'edge'
 
 type Product = {
-  id: number;
-  name: string;
-  price: number | null;
-  image: string | null;
-  slug: string;
-};
+  id: string
+  name: string
+  price: number | null
+  image: string | null
+  slug: string
+  short_desc: string | null
+}
 
 async function fetchProducts(): Promise<Product[]> {
   const res = await fetch('/api/products', {
     cache: 'no-store',
     // @ts-ignore
     next: { revalidate: 0 },
-  }).catch(() => null);
+  }).catch(() => null)
 
-  if (!res || !res.ok) return [];
+  if (!res || !res.ok) return []
 
-  let json: any = {};
+  let json: any = {}
   try {
-    json = await res.json();
+    json = await res.json()
   } catch {
-    return [];
+    return []
   }
 
-  const data = json?.data;
-  return Array.isArray(data) ? (data as Product[]) : [];
+  const data = json?.data
+  return Array.isArray(data) ? (data as Product[]) : []
 }
 
 export default async function CatalogPage() {
-  const list = await fetchProducts();
+  const list = await fetchProducts()
 
   return (
     <main className="container mx-auto p-6">
@@ -48,7 +49,6 @@ export default async function CatalogPage() {
         <ul className="space-y-3">
           {list.map((p) => (
             <li key={p.id} className="flex items-center gap-3">
-              {/* 圖片（若無圖則顯示占位） */}
               {p.image ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -71,6 +71,7 @@ export default async function CatalogPage() {
                 <div className="text-sm opacity-70">
                   {p.price == null ? 'Price: N/A' : `Price: ${p.price}`}
                 </div>
+                {p.short_desc && <div className="text-xs opacity-60">{p.short_desc}</div>}
                 <div className="text-xs opacity-60">slug: {p.slug}</div>
               </div>
             </li>
@@ -78,5 +79,5 @@ export default async function CatalogPage() {
         </ul>
       )}
     </main>
-  );
+  )
 }

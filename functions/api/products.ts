@@ -1,56 +1,65 @@
 // functions/api/products.ts
+import type { CatalogProduct } from '../../lib/server/catalog'
+import { listCatalogProducts } from '../../lib/server/catalog'
+
 export interface Product {
-  id: number;
-  name: string;
-  price: number | null;
-  image: string | null;
-  slug: string;
+  id: string
+  name: string
+  price: number | null
+  image: string | null
+  slug: string
+  short_desc: string | null
 }
 
-type Bindings = { DB?: D1Database };
+type Bindings = {
+  DB?: D1Database
+  ASSETS?: R2Bucket
+}
+
+const FALLBACK: Product[] = [
+  {
+    id: 'fallback-tote',
+    name: 'Tote Bag',
+    price: 12.5,
+    image: null,
+    slug: 'tote-bag',
+    short_desc: '開發環境範例商品（未連線到 D1）。',
+  },
+  {
+    id: 'fallback-gift-box',
+    name: 'Gift Box',
+    price: 25,
+    image: null,
+    slug: 'gift-box',
+    short_desc: '開發環境範例商品（未連線到 D1）。',
+  },
+]
 
 export const onRequestGet: PagesFunction<Bindings> = async ({ env }) => {
   try {
-    const DB = (env as Bindings).DB;
+    const DB = env.DB
+    const ASSETS = env.ASSETS
 
-    // 沒綁 D1：直接回內建資料，避免 500
     if (!DB) {
-      const fallback: Product[] = [
-        { id: 1, name: 'Tote Bag', price: 12.5, image: null, slug: 'tote-bag' },
-        { id: 2, name: 'Gift Box', price: 25.0, image: null, slug: 'gift-box' },
-      ];
-      return Response.json({ ok: true, source: 'fallback', data: fallback });
+      return Response.json({ ok: true, source: 'fallback', data: FALLBACK })
     }
 
-    // 有 D1：正常讀 DB（含建表與種子）
-    await DB.exec(`
-      CREATE TABLE IF NOT EXISTS products (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        price REAL,
-        image TEXT,
-        slug TEXT UNIQUE NOT NULL
-      );
-    `);
+    const rows = await listCatalogProducts({ DB, ASSETS })
 
-    await DB.prepare(`
-      INSERT OR IGNORE INTO products (name, price, image, slug)
-      VALUES ('Tote Bag', 12.5, NULL, 'tote-bag'),
-             ('Gift Box', 25.0, NULL, 'gift-box')
-    `).run();
+    const data: Product[] = rows.map((item: CatalogProduct) => ({
+      id: item.id,
+      name: item.name,
+      price: item.price,
+      image: item.image,
+      slug: item.slug,
+      short_desc: item.short_desc,
+    }))
 
-    const { results } = await DB.prepare(`
-      SELECT id, name, price, image, slug
-      FROM products
-      ORDER BY id DESC
-    `).all<Product>();
-
-    return Response.json({ ok: true, source: 'd1', data: results ?? [] });
+    return Response.json({ ok: true, source: 'd1', data })
   } catch (err: any) {
-    // 避免未處理例外導致 500
     return new Response(
       JSON.stringify({ ok: false, error: String(err?.message ?? err) }),
-      { status: 200, headers: { 'content-type': 'application/json' } }
-    );
+      { status: 500, headers: { 'content-type': 'application/json' } }
+    )
   }
-};
+}

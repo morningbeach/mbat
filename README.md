@@ -5,7 +5,8 @@ A production-ready starter for a packaging / gift-box trading website.
 ## Tech
 - **Next.js 14 (App Router)** on Cloudflare Pages (via `@cloudflare/next-on-pages`)
 - **Cloudflare Pages Functions + Hono** for API (Edge/Workers runtime)
-- **Cloudflare D1** for database, managed by `wrangler d1 migrations`
+- **Cloudflare D1** for relational data, managed by `wrangler d1 migrations`
+- **Cloudflare R2** for product/RFQ assets, exposed via the `ASSETS` binding
 - **Turnstile** ready (frontend stub), Zod validation on API
 
 ## Quick Start
@@ -21,23 +22,30 @@ wrangler d1 create mb-pack-db
 # copy database_id into wrangler.toml under [[d1_databases]]
 ```
 
-3) **Apply migrations + seed**
+3) **Create R2 bucket (first time)**
+```bash
+wrangler r2 bucket create mb-pack-assets
+wrangler r2 bucket create mb-pack-assets-preview --jurisdiction automatic
+```
+
+4) **Apply migrations + seed**
 ```bash
 pnpm migrate
 pnpm seed
 ```
 
-4) **Run locally (Pages dev)**
+5) **Run locally (Pages dev)**
 ```bash
 pnpm dev
 ```
 
-5) **Deploy (Cloudflare Pages + GitHub Actions)**
+6) **Deploy (Cloudflare Pages + GitHub Actions)**
 - Create a Pages project and connect this repo
 - Build command: `npx @cloudflare/next-on-pages@latest`
 - Build output: `.vercel/output/static`
 - Functions directory: `functions/`
 - In Pages project settings → **D1 Databases**: bind your DB to variable **DB**
+- In Pages project settings → **R2 Buckets**: bind your buckets to **ASSETS**
 - Set CF secrets for GitHub: `CF_API_TOKEN`, `CF_ACCOUNT_ID`
 
 ## Environment

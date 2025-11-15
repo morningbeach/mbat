@@ -1,49 +1,50 @@
 // app/p/[slug]/page.tsx
-import { notFound } from 'next/navigation';
+import { notFound } from 'next/navigation'
 
-export const dynamic = 'force-dynamic';
-export const runtime = 'edge';
+export const dynamic = 'force-dynamic'
+export const runtime = 'edge'
 
 type Product = {
-  id: number;
-  name: string;
-  price: number | null;
-  image: string | null;
-  slug: string;
-};
+  id: string
+  name: string
+  price: number | null
+  image: string | null
+  slug: string
+  short_desc: string | null
+}
 
-async function fetchProducts(): Promise<Product[]> {
-  const res = await fetch('/api/products', {
+async function fetchProduct(slug: string): Promise<Product | null> {
+  const res = await fetch(`/api/products/${slug}`, {
     cache: 'no-store',
     // @ts-ignore
     next: { revalidate: 0 },
-  }).catch(() => null);
+  }).catch(() => null)
 
-  if (!res || !res.ok) return [];
-  let json: any = {};
+  if (!res || !res.ok) return null
+
+  let json: any = {}
   try {
-    json = await res.json();
+    json = await res.json()
   } catch {
-    return [];
+    return null
   }
-  const data = json?.data;
-  return Array.isArray(data) ? (data as Product[]) : [];
+
+  const data = json?.data
+  if (!data || typeof data !== 'object') return null
+  return data as Product
 }
 
 export default async function ProductPage({
-  // ✅ Next.js 15：params 是 Promise，需要 await
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ slug: string }>
 }) {
-  const { slug } = await params;
+  const { slug } = await params
 
-  const list = await fetchProducts();
-  const product = list.find((p) => p.slug === slug);
+  const product = await fetchProduct(slug)
 
   if (!product) {
-    // 找不到就回 404
-    notFound();
+    notFound()
   }
 
   return (
@@ -75,7 +76,10 @@ export default async function ProductPage({
         <div className="text-base">
           {product.price == null ? 'Price: N/A' : `Price: ${product.price}`}
         </div>
+        {product.short_desc && (
+          <div className="text-sm opacity-70">{product.short_desc}</div>
+        )}
       </div>
     </main>
-  );
+  )
 }
